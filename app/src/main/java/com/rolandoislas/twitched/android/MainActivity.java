@@ -2,7 +2,9 @@ package com.rolandoislas.twitched.android;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Handler;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -43,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     static final String PREF_MAIN = "preferences_main";
     static final String ROKU_IP = "roku_ip";
     public static final String MSG_ERR = MainActivity.class.getSimpleName() + "msg.error";
+    private static final String URL_INFO = "https://www.twitched.org/";
     private Logger logger;
     private Webb webb;
     private Handler handler;
@@ -89,6 +92,17 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 }
                 return false;
+            }
+        });
+        // Info button event
+        FloatingActionButton infoButton = (FloatingActionButton) findViewById(R.id.infoButton);
+        infoButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View infoButton) {
+                Intent websiteIntent = new Intent(Intent.ACTION_VIEW);
+                websiteIntent.setData(Uri.parse(URL_INFO));
+                startActivity(websiteIntent);
+                finish();
             }
         });
         // Start search
