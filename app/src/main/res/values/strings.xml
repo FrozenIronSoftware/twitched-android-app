@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Twitched</string>
+    <string name="title_ip">IP or Hostname</string>
+    <string name="title_rokus">Rokus</string>
+    <string name="message_ip_saved">IP/Hostname saved</string>
+    <string name="title_casting">Attempting to cast to the Twitched Roku app</string>
+    <string name="message_no_ip_set">No IP/hostname set</string>
+    <string name="message_cast_fail">Failed to cast to the Twitched Roku app</string>
+    <string name="message_cast_success">Successfully casted to the Twitched Roku app</string>
+</resources>
