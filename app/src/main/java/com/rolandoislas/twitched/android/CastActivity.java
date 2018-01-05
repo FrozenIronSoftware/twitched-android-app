@@ -17,7 +17,7 @@ import static com.rolandoislas.twitched.android.MainActivity.ROKU_IP;
 
 public class CastActivity extends AppCompatActivity {
 
-    private static final String APP_ID = "206723_e381"; // TODO update the unpublished id to the published id
+    private static final String APP_ID = "206723";
     private Logger logger;
     private Webb webb;
     private Handler handler;
