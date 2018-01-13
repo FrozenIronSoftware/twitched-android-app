@@ -2,6 +2,7 @@ package com.rolandoislas.twitched.android;
 
 import android.content.Intent;
 import android.os.Handler;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import com.goebl.david.Response;
@@ -43,22 +44,32 @@ public class CastActivity extends AppCompatActivity {
             exit();
             return;
         }
-        Pattern twitchChannelUrl = Pattern.compile(".*https?://.*twitch.tv/(.*)(?:\\?.*)+?");
-        Matcher matcher = twitchChannelUrl.matcher(extraText);
-        if (!matcher.matches()) {
+        logger.info(String.format("Data: %s", extraText));
+        Pattern twitchChannelUrl = Pattern.compile(".*https?://.*twitch.tv/([^?#&]+).*");
+        Pattern twitchVideoUrl = Pattern.compile(".*https?://.*twitch.tv/(?:[^?#&/]+)/v/([^?#&]+).*");
+        Matcher channelMatcher = twitchChannelUrl.matcher(extraText);
+        Matcher videoMatcher = twitchVideoUrl.matcher(extraText);
+        if (!channelMatcher.matches() && !videoMatcher.matches()) {
             logger.info(String.format("Extra text does not contain a Twitch URL: %s", extraText));
             exit();
             return;
         }
-        String userName = matcher.group(1);
-        cast(userName);
+        if (videoMatcher.matches()) {
+            String id = videoMatcher.group(1);
+            cast(null, id);
+        }
+        else if (channelMatcher.matches()) {
+            String userName = channelMatcher.group(1);
+            cast(userName, null);
+        }
     }
 
     /**
      * Cast to the roku
      * @param userName twitch channel name
+     * @param videoId video id
      */
-    private void cast(final String userName) {
+    private void cast(@Nullable final String userName, @Nullable final String videoId) {
         final String ip = getSharedPreferences(PREF_MAIN, MODE_PRIVATE).getString(ROKU_IP, "");
         if (ip.isEmpty()) {
             exit(R.string.message_no_ip_set);
@@ -67,13 +78,27 @@ public class CastActivity extends AppCompatActivity {
         Thread castThread = new Thread(new Runnable() {
             @Override
             public void run() {
+                String contentId;
+                String mediaType;
+                if (userName != null) {
+                    contentId = String.format("twitch_stream_%s", userName);
+                    mediaType = "live";
+                }
+                else if (videoId != null) {
+                    contentId = String.format("twitch_video_%s", videoId);
+                    mediaType = "special";
+                }
+                else
+                    throw new RuntimeException("Invalid arguments");
                 // Post to Roku
                 try {
                     Response<Void> response = webb.post(String.format(
-                            "http://%s:8060/launch/%s?contentId=twitch_stream&mediaType=live&twitch_user_name=%s",
+                            "http://%s:8060/launch/%s?contentId=%s&mediaType=%s",
                             ip,
                             APP_ID,
-                            userName))
+                            contentId,
+                            mediaType
+                    ))
                             .body("")
                             .retry(1, false)
                             .ensureSuccess()
