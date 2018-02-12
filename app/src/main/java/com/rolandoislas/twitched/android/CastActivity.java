@@ -46,7 +46,7 @@ public class CastActivity extends AppCompatActivity {
         }
         logger.info(String.format("Data: %s", extraText));
         Pattern twitchChannelUrl = Pattern.compile(".*https?://.*twitch.tv/([^?#&]+).*");
-        Pattern twitchVideoUrl = Pattern.compile(".*https?://.*twitch.tv/(?:[^?#&/]+)/v/([^?#&]+).*");
+        Pattern twitchVideoUrl = Pattern.compile(".*https?://.*twitch.tv/(?:[^?#&/]+)/v/([^?#&]+)(?:.*t=(\\d+))?.*");
         Matcher channelMatcher = twitchChannelUrl.matcher(extraText);
         Matcher videoMatcher = twitchVideoUrl.matcher(extraText);
         if (!channelMatcher.matches() && !videoMatcher.matches()) {
@@ -56,11 +56,12 @@ public class CastActivity extends AppCompatActivity {
         }
         if (videoMatcher.matches()) {
             String id = videoMatcher.group(1);
-            cast(null, id);
+            String time = videoMatcher.group(2);
+            cast(null, id, time);
         }
         else if (channelMatcher.matches()) {
             String userName = channelMatcher.group(1);
-            cast(userName, null);
+            cast(userName, null, null);
         }
     }
 
@@ -68,8 +69,9 @@ public class CastActivity extends AppCompatActivity {
      * Cast to the roku
      * @param userName twitch channel name
      * @param videoId video id
+     * @param time
      */
-    private void cast(@Nullable final String userName, @Nullable final String videoId) {
+    private void cast(@Nullable final String userName, @Nullable final String videoId, @Nullable final String time) {
         final String ip = getSharedPreferences(PREF_MAIN, MODE_PRIVATE).getString(ROKU_IP, "");
         if (ip.isEmpty()) {
             exit(R.string.message_no_ip_set);
@@ -93,11 +95,12 @@ public class CastActivity extends AppCompatActivity {
                 // Post to Roku
                 try {
                     Response<Void> response = webb.post(String.format(
-                            "http://%s:8060/launch/%s?contentId=%s&mediaType=%s",
+                            "http://%s:8060/launch/%s?contentId=%s&mediaType=%s&time=%s",
                             ip,
                             APP_ID,
                             contentId,
-                            mediaType
+                            mediaType,
+                            time == null ? "0" : time
                     ))
                             .body("")
                             .retry(1, false)
