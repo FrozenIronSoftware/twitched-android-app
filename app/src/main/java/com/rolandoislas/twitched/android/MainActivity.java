@@ -3,17 +3,20 @@ package com.rolandoislas.twitched.android;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.goebl.david.Response;
@@ -33,20 +36,22 @@ import java.io.StringReader;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
     static final String PREF_MAIN = "preferences_main";
     static final String ROKU_IP = "roku_ip";
+    static final String ROKU_APP_ID = "roku_app_id";
     public static final String MSG_ERR = MainActivity.class.getSimpleName() + "msg.error";
     private static final String URL_INFO = "https://www.twitched.org/";
-    private Logger logger;
     private Webb webb;
     private Handler handler;
     private List<String> rokus;
@@ -55,15 +60,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Fields
-        logger = Logger.getLogger("Twitched");
         webb = Webb.create();
         handler = new Handler(getMainLooper());
         rokus = new ArrayList<>();
         // Set view
         setContentView(R.layout.activity_main);
+        // Populate dropdown
+        List<String> appTypes = new ArrayList<>();
+        appTypes.add(getString(R.string.title_twitched));
+        appTypes.add(getString(R.string.title_twitched_zero));
+        Spinner appIdDropdown = (Spinner) findViewById(R.id.appIdDropdown);
+        appIdDropdown.setAdapter(new ArrayAdapter<>(getBaseContext(), android.R.layout.simple_list_item_1, appTypes));
+        appIdDropdown.setSelection(getAppIdIndex(), false);
         // Handle list item click
         ListView rokuList = (ListView) findViewById(R.id.rokuList);
-        rokuList.setEmptyView(findViewById(R.id.searchIndicator));
         rokuList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -75,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
                 TextView ipField = (TextView) findViewById(R.id.ipField);
                 ipField.setText(ip);
                 saveIp(ip);
+                saveAppId();
                 showMessage(R.string.message_ip_saved);
             }
         });
@@ -88,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
                     if (ipField.getText().toString().isEmpty())
                         return false;
                     saveIp(ipField.getText().toString());
+                    saveAppId();
                     showMessage(R.string.message_ip_saved);
                     return true;
                 }
@@ -105,8 +117,49 @@ public class MainActivity extends AppCompatActivity {
                 finish();
             }
         });
+        // Retry button event
+        Button retryButton = (Button) findViewById(R.id.buttonRetry);
+        retryButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View retryButton) {
+                retryButton.setVisibility(View.GONE);
+                findViewById(R.id.searchIndicator).setVisibility(View.VISIBLE);
+                rokus.clear();
+                ((ListView) findViewById(R.id.rokuList)).setAdapter(null);
+                searchForRokus();
+            }
+        });
+        // Save button event
+        Button saveButton = (Button) findViewById(R.id.buttonSave);
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View saveButton) {
+                TextView ipField = (TextView) findViewById(R.id.ipField);
+                if (ipField.getText().toString().isEmpty())
+                    return;
+                saveIp(ipField.getText().toString());
+                saveAppId();
+                showMessage(R.string.message_ip_saved);
+            }
+        });
         // Start search
         searchForRokus();
+    }
+
+    /**
+     * Read the app id index from the dropdown and save it to the preferences
+     */
+    private void saveAppId() {
+        Spinner appIdDropdown = (Spinner) findViewById(R.id.appIdDropdown);
+        saveAppIdIndex(appIdDropdown.getSelectedItemPosition());
+    }
+
+    /**
+     * Get the save app id type
+     * @return index
+     */
+    private int getAppIdIndex() {
+        return getSharedPreferences(PREF_MAIN, MODE_PRIVATE).getInt(ROKU_APP_ID, 0);
     }
 
     /**
@@ -155,6 +208,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * Save the app id index
+     * @param index index value to save
+     */
+    private void saveAppIdIndex(int index) {
+        getSharedPreferences(PREF_MAIN, MODE_PRIVATE).edit().putInt(ROKU_APP_ID, index).apply();
+    }
+
+    /**
      * Start a background search for Rokus on the network
      */
     private void searchForRokus() {
@@ -166,7 +227,7 @@ public class MainActivity extends AppCompatActivity {
         });
         ssdpThread.setName("SSDP");
         ssdpThread.setDaemon(true);
-        logger.info("Starting search thread");
+        Log.d("Main", "Starting search thread");
         ssdpThread.start();
     }
 
@@ -174,6 +235,7 @@ public class MainActivity extends AppCompatActivity {
      * Search for Rokus via SSDP
      */
     private void searchSsdp() {
+        Log.d("Search", "Starting SSDP search");
         byte[] msearchMessage =
                 "M-SEARCH * HTTP/1.1\nHost: 239.255.255.250:1900\nMan: \"ssdp:discover\"\nST: roku:ecp\n"
                         .getBytes();
@@ -181,10 +243,11 @@ public class MainActivity extends AppCompatActivity {
             InetAddress sendTo = InetAddress.getByName("239.255.255.250");
             DatagramPacket msearchPacket = new DatagramPacket(msearchMessage, msearchMessage.length, sendTo, 1900);
             DatagramSocket msearchSocket = new DatagramSocket();
+            msearchSocket.setSoTimeout(5000);
             byte[] responseBuffer = new byte[2048];
             msearchSocket.send(msearchPacket);
             DatagramPacket responsePacket = new DatagramPacket(responseBuffer, responseBuffer.length);
-            for (int reponseNumber = 0; reponseNumber < 20; reponseNumber++) {
+            while (msearchSocket.isConnected()) {
                 msearchSocket.receive(responsePacket);
                 String response = new String(responsePacket.getData());
                 // Parse response
@@ -200,32 +263,94 @@ public class MainActivity extends AppCompatActivity {
                 if (!matcher.matches())
                     continue;
                 String ip = matcher.group(1);
-                addRokuToSearchList(ip);
+                addRokuToSearchList(ip, false);
             }
             msearchSocket.close();
-            logger.info("Search finished");
+            Log.d("Search", "Search finished");
         }
+        catch (SocketTimeoutException ignore) { }
         catch (IOException e) {
             e.printStackTrace();
         }
+        if (rokus.size() == 0)
+            searchIps();
+        else {
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    findViewById(R.id.searchIndicator).setVisibility(View.GONE);
+                    findViewById(R.id.buttonRetry).setVisibility(View.VISIBLE);
+                }
+            });
+        }
+    }
+
+    /**
+     * Search for Rokus by trying all variations of this devices IPs with their last octet changed
+     */
+    private void searchIps() {
+        Log.d("Search", "Starting IP search");
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp())
+                    continue;
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    String localIp = address.getHostAddress();
+                    Pattern ipv4Regex = Pattern.compile("((?:\\d+\\.){3})\\d+");
+                    Matcher matcher = ipv4Regex.matcher(localIp);
+                    if (!matcher.matches())
+                        continue;
+                    String ipPrefix = matcher.group(1);
+                    for (int octet = 1; octet < 255; octet++) {
+                        String ip = String.format(Locale.US, "%s%d", ipPrefix, octet);
+                        addRokuToSearchList(ip, true);
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
+        if (rokus.size() == 0) {
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    showMessage(R.string.message_search_failed, true);
+                }
+            });
+        }
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                findViewById(R.id.searchIndicator).setVisibility(View.GONE);
+                findViewById(R.id.buttonRetry).setVisibility(View.VISIBLE);
+            }
+        });
     }
 
     /**
      * Add a roku to the search list
      * @param ip roku ip
      */
-    private void addRokuToSearchList(final String ip) {
+    private void addRokuToSearchList(final String ip, boolean fastTimeout) {
+        // Check if the ip is already in the list
+        for (String roku : rokus) {
+            if (roku.contains(ip))
+                return;
+        }
         // Query device for its name
         Response<String> response;
         try {
             response = webb
                 .get(String.format("http://%s:8060/query/device-info", ip))
-                .retry(1, false)
+                .connectTimeout(fastTimeout ? 50 : 10000)
                 .ensureSuccess()
                 .asString();
         }
-        catch (WebbException e) {
-            e.printStackTrace();
+        catch (WebbException ignore) {
             return;
         }
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();

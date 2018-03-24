@@ -7,4 +7,9 @@
     <string name="message_no_ip_set">No IP/hostname set</string>
     <string name="message_cast_fail">Failed to cast to the Twitched Roku app</string>
     <string name="message_cast_success">Successfully casted to the Twitched Roku app</string>
+    <string name="message_search_failed">No Rokus found on the network</string>
+    <string name="button_retry">Retry</string>
+    <string name="button_save">Save</string>
+    <string name="title_twitched">Twitched</string>
+    <string name="title_twitched_zero">Twitched Zero</string>
 </resources>

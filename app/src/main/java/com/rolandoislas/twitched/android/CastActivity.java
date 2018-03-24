@@ -14,11 +14,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.rolandoislas.twitched.android.MainActivity.PREF_MAIN;
+import static com.rolandoislas.twitched.android.MainActivity.ROKU_APP_ID;
 import static com.rolandoislas.twitched.android.MainActivity.ROKU_IP;
 
 public class CastActivity extends AppCompatActivity {
 
-    private static final String APP_ID = "206723";
+    private static final String APP_ID_TWITCHED = "206723";
+    private static final String APP_ID_TWITCHED_ZERO = "223126";
     private Logger logger;
     private Webb webb;
     private Handler handler;
@@ -73,6 +75,7 @@ public class CastActivity extends AppCompatActivity {
      */
     private void cast(@Nullable final String userName, @Nullable final String videoId, @Nullable final String time) {
         final String ip = getSharedPreferences(PREF_MAIN, MODE_PRIVATE).getString(ROKU_IP, "");
+        final int appIdIndex = getSharedPreferences(PREF_MAIN, MODE_PRIVATE).getInt(ROKU_APP_ID, 0);
         if (ip.isEmpty()) {
             exit(R.string.message_no_ip_set);
             return;
@@ -97,7 +100,7 @@ public class CastActivity extends AppCompatActivity {
                     Response<Void> response = webb.post(String.format(
                             "http://%s:8060/launch/%s?contentId=%s&mediaType=%s&time=%s",
                             ip,
-                            APP_ID,
+                            appIdIndex == 0 ? APP_ID_TWITCHED : APP_ID_TWITCHED_ZERO,
                             contentId,
                             mediaType,
                             time == null ? "0" : time
