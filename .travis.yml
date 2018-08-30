@@ -9,10 +9,6 @@ android:
     - build-tools-27.0.3
     - android-26
 
-install:
-  - echo yes | sdkmanager "extras;m2repository;com;android;support;constraint;constraint-layout;2.0.0-alpha2"
-  - echo yes | sdkmanager "extras;m2repository;com;android;support;constraint;constraint-layout-solver;2.0.0-alpha2"
-
 before_script:
 - chmod +x gradlew
 
