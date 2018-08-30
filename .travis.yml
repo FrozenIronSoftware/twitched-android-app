@@ -6,8 +6,8 @@ jdk:
 android:
   components:
     - tools
-    - build-tools-27.0.3
-    - android-26
+    - build-tools-28.0.2
+    - android-28
 
 before_script:
 - chmod +x gradlew
